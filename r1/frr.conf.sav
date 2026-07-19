@@ -1,0 +1,23 @@
+frr version 8.4_git
+frr defaults traditional
+hostname f258e40243f9
+log file /var/log/frr/frr.log
+no ipv6 forwarding
+!
+interface eth0
+ description Link to Backbone Area 0
+ ip address 10.0.0.11/24
+ ip ospf area 0
+ ip ospf mtu-ignore
+ ip ospf network point-to-point
+exit
+!
+interface eth1
+ description Link to Fuzzing Network
+ ip address 172.16.66.11/24
+exit
+!
+router ospf
+ ospf router-id 1.1.1.1
+exit
+!
