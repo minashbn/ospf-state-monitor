@@ -10,15 +10,16 @@ class AnalysisContext:
         fuzzer_details: Dict[str, Any],
         target_packet: Dict[str, Any],
         global_state: Any,
+        neighbor_log:Any
     ):
         self.fuzzer_details = fuzzer_details
         self.target_packet = target_packet
         self.global_state = global_state
+        self.neighbor_log = neighbor_log
 
 
 class OspfPacketHandler(ABC):
 
-    PACKET_TYPE: int
 
     @abstractmethod
     def analyze(self, ctx: AnalysisContext) -> Dict[str, bool]:

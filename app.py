@@ -27,6 +27,7 @@ def analyze_step():
 
     fuzzer_state = fuzzer_packet.get("current_fuzzing_state")
     fuzzer_details = fuzzer_packet.get("details", {})
+    target_neighbor_log = get_frr_internal_neighbors_json()
 
 
     if not fuzzer_details or not target_packet:
@@ -36,7 +37,8 @@ def analyze_step():
     ctx = AnalysisContext(
         fuzzer_details=fuzzer_details,
         target_packet=target_packet,
-        global_state=global_ospf_state
+        global_state=global_ospf_state,
+        neighbor_log=target_neighbor_log
     )
 
     # 3. Select the appropriate handler based on the fuzzing type

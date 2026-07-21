@@ -3,7 +3,6 @@ from base import OspfPacketHandler, AnalysisContext
 from typing import Dict
 
 class hello_2wayHandler(OspfPacketHandler):
-    PACKET_TYPE = 1  # OSPF Hello Packet
 
     def analyze(self, ctx: AnalysisContext) -> Dict[str, bool]:
         
@@ -40,7 +39,14 @@ class hello_2wayHandler(OspfPacketHandler):
         )
 
         target_neighbors = target_details.get("neighbors", [])
-        is_accepted = fuzzer_router_id in target_neighbors or pkt_type == 2
+        neighbors=ctx.neighbor_log.get("neighbors", {})
+        state = 'DOWN'
+        if fuzzer_router_id in neighbors and len(neighbors[fuzzer_router_id]) > 0:
+            neighbor_info = neighbors[fuzzer_router_id][0]
+            state = neighbor_info.get("state")
+
+        is_accepted = (fuzzer_router_id in target_neighbors or pkt_type == 2) and ("Init" in state)
+        
 
         if has_mismatch and is_accepted:
             bugs["rfc_invalid_state_acceptance" if pkt_type == 1 else "state_bypass"] = True
