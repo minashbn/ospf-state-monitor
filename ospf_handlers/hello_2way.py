@@ -1,6 +1,8 @@
 # ospf_handlers/hello.py
 from base import OspfPacketHandler, AnalysisContext
 from typing import Dict
+from .utils import *
+
 
 class hello_2wayHandler(OspfPacketHandler):
 
@@ -44,8 +46,9 @@ class hello_2wayHandler(OspfPacketHandler):
         if fuzzer_router_id in neighbors and len(neighbors[fuzzer_router_id]) > 0:
             neighbor_info = neighbors[fuzzer_router_id][0]
             state = neighbor_info.get("state")
+            state=clean_state(state)
 
-        is_accepted = (fuzzer_router_id in target_neighbors or pkt_type == 2) and ("Init" in state)
+        is_accepted = state.lower()=="init" or pkt_type == 2 
         
 
         if has_mismatch and is_accepted:

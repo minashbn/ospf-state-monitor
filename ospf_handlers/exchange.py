@@ -4,11 +4,14 @@ from typing import Dict
 import ipaddress
 from typing import Dict, Any
 from .utils import *
-# {'sent_packet': {'type': 2, 'current_fuzzing_state': 3, 'details': {'router_id': '1.1.1.1', 'seq': 1, 'mtu': 0, 'options': 'E', 'flags': 'MS+M+I', 'init': True, 'more': True, 'master': True, 'lsa_headers': []}}, ''
-# 'received_packet': {'type': 2, 'current_fuzzing_state': 3, 'details': {'router_id': '2.2.2.2', 'seq': 891651136, 'mtu': 1500, 'options': 'E', 'flags': 'MS+M+I', 'init': True, 'more': True, 'master': True, 'lsa_headers': []}}}
+# {'sent_packet': {'type': 2, 'current_fuzzing_state': 4, 'details': {'router_id': '1.1.1.1', 'seq': 1037335533, 'mtu': 0, 'options': 'E', 'options_int': 2, 'flags': '', 'init': False, 'more': False, 'master': False
+# , 'lsa_headers': [{'type': 7, 'id': '10.0.0.1', 'adv_router': '10.0.0.1', 'seq': 2147483649, 'age': 1, 'chksum': 34236}]}}, 
+#  'received_packet': {'type': 2, 'current_fuzzing_state': 4, 'details': {'router_id': '2.2.2.2', 'seq': 1037335533, 'mtu': 1500, 'options': 'E', 'options_int': 2, 'flags': 'MS+M+I', 'init': True, 'more': True, 'master': True, 'lsa_headers': []}}}
 
 
-class dbd_exstartHandler(OspfPacketHandler):
+
+
+class dbd_exchangeHandler(OspfPacketHandler):
 
     def analyze(self, ctx: AnalysisContext) -> Dict[str, bool]:
         # Rule 1: No response received within timeout period
@@ -59,48 +62,50 @@ class dbd_exstartHandler(OspfPacketHandler):
         # --- Error Condition Detection ---
 
         # 1. MTU Mismatch
-        mtu_mismatch = fuzzer_mtu > target_local_mtu 
+        mtu_mismatch =(fuzzer_mtu != 0) and fuzzer_mtu > target_local_mtu 
 
         # 2. Options Mismatch (Area capabilities)
         options_mismatch = (fuzzer_e_bit != target_e_bit) or (fuzzer_n_bit != target_n_bit)
 
-        # 3. Unexpected Control Bits (RFC 2328 Section 10.6)
-        # Invalid combinations: Init bit set without Master bit, or Init bit set without More bit
-        invalid_control_bits = (fuzzer_init and not fuzzer_master) or (fuzzer_init and not fuzzer_more)
 
         our_rid = ipaddress.IPv4Address(fuzzer_router_id)
         target_rid = ipaddress.IPv4Address(target_details.get("router_id"))
 
 
-        malformed_packet=(mtu_mismatch or invalid_control_bits or options_mismatch)
+        malformed_packet=(mtu_mismatch or options_mismatch)
         
         # --- RFC Conformance Validation ---
 
         # Case A: Malformed packet sent -> Target must NOT transition to Exchange state
         if malformed_packet:
             if target_neighbor_state.lower()=="exchange" :
-                if our_rid > target_rid:
-            # This should never happen under normal protocol logic.
-                    is_fuzzer_master = True
-                else:
-                    is_fuzzer_master = False
-                seq_valid = ( is_fuzzer_master and target_seq == fuzzer_seq and target_master == False ) or  (not is_fuzzer_master and target_seq != fuzzer_seq and target_master == True) 
-
-                
                 if mtu_mismatch:
                     bugs["rfc_mtu_mismatch_accepted"] = True
                 if options_mismatch:
                     bugs["rfc_options_mismatch_accepted"] = True
+                
+                invalid_control_seq = (fuzzer_init == 1) or (target_init == 1)
+
+                if our_rid > target_rid:
+                    invalid_control_seq = fuzzer_master != 1 or fuzzer_seq != target_seq
+                else:
+                    invalid_control_seq = target_master != 1 or target_seq-fuzzer_seq != 1
+
+                
+              
+                if invalid_control_seq:
+                    bugs["rfc_invalid_control_bits_or_sequence_number_accepted"] = True
+
+            elif target_neighbor_state.lower()=="exstart":
+                invalid_control_bits = (fuzzer_init and not fuzzer_master) or (fuzzer_init and not fuzzer_more)
+
                 if invalid_control_bits:
                     bugs["rfc_invalid_control_bits_accepted"] = True
-                if not seq_valid:
-                    bugs["invalid_seq_selected"]=True
-
 
         # Case B: Valid ExStart negotiation -> Target should progress or respond
         else:
             # If valid packet sent but target unexpectedly drops adjacency or resets to Down/Init
-            if target_neighbor_state.lower() in ["down", "init"] :
+            if target_neighbor_state.lower() in ["down", "init","exstart"] :
                 bugs["rfc_valid_exstart_rejected"] = True
             
 
